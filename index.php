@@ -78,8 +78,8 @@ $NOTSET = "RESERVE" ;  // constant: call number was not provided in the request
 // Get mapping file file handel to process the file
 $config_file = dirname(__FILE__) . '/mapping.csv';
 
-  // $DEBUG_THINGS = false ; // flag to display debug info to browser window
-  $DEBUG_THINGS = true ; // flag to display debug info to browser window
+  $DEBUG_THINGS = false ; // flag to display debug info to browser window
+  // $DEBUG_THINGS = true ; // flag to display debug info to browser window
   $line_length = 4096; // amount of chars per line to read from csv file
 
 // CONSTANTS -------------------------------------------------------------------
@@ -233,19 +233,19 @@ if(file_exists($config_file)) {
         // ADACOSTA TEST ====================================================================
         $callnumber = $old_callnumber ; // reset
         if ((strlen($callnumber) >= 1) && (strlen($range_start)) <= 1) {
-          echo "<br />START"." strcmp ". $callnumber[0] . " && ". $range_start . " (" . strcmp($callnumber[0], $range_start) . ")";
+          if ($DEBUG_THINGS) { echo "<br />START"." strcmp ". $callnumber[0] . " && ". $range_start . " (" . strcmp($callnumber[0], $range_start) . ")";}
           $start_match_flag = (strcmp($callnumber[0], $range_start) >= 0) ? true : false ;
         }
         else {
-          echo "<br />START"." strcmp ". $callnumber . " && ". $range_start . " (" . strcmp($callnumber, $range_start) . ")";
+          if ($DEBUG_THINGS) { echo "<br />START"." strcmp ". $callnumber . " && ". $range_start . " (" . strcmp($callnumber, $range_start) . ")";}
           $start_match_flag = (strcmp($callnumber[0], $range_start) >= 0) ? true : false ;
         }
         if ((strlen($callnumber) >= 1) && (strlen($range_end)) <= 1) {
-          echo "<br />END"." strcmp ". $callnumber[0] . " && ". $range_end . " (" . strcmp($callnumber[0], $range_end) . ")";
+          if ($DEBUG_THINGS) { echo "<br />END"." strcmp ". $callnumber[0] . " && ". $range_end . " (" . strcmp($callnumber[0], $range_end) . ")";}
           $end_match_flag = (strcmp($callnumber[0], $range_end) <= 0) ? true : false ;
         }
         else {
-          echo "<br />END"." strcmp ". $callnumber . " && ". $range_end . " (" . strcmp($callnumber, $range_end) . ")";
+          if ($DEBUG_THINGS) { echo "<br />END"." strcmp ". $callnumber . " && ". $range_end . " (" . strcmp($callnumber, $range_end) . ")";}
           $end_match_flag = (strcmp($callnumber, $range_end) <= 0) ? true : false ;
         }
         // ADACOSTA end TEST ================================================================

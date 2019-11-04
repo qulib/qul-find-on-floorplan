@@ -27,6 +27,16 @@
 // Added check for "|" pipe character as variable delimination
 // PrimoVE bug where "&" ampersand character being replaced with &amp; in URL.
 // ../find-on-floorplan/?loc=sl|cn=%20PS8319.O73%20E56%202018
+//
+// NOTE: ADACOSTA - Nov 04, 2019
+// Bug fixes, modifications for new mappings from PrimoVE, HTML output styling.
+// Supporting AC123, ZZ123 call numbers. A123, AA123 through to Z123, ZZ123.
+// Corrected erroneous results for call numbers that fall within range breaks;
+//    - such as range A = "A, BF123"; range B = "BX123, ZZ"
+//    - call numbers BF124 to BX122 would resolve incorrectly, should actual result in "no map location for this item"
+//    - if mapping range ends in "Z", then ZA now results in "no map location for this item" (expected behaviour)
+//    - if mapping range ends in "ZZ", then ZA now locates correct map (expected behaviour)
+
 
 // request values --------------------------------------------------------------
 $request_location = "";
@@ -61,10 +71,6 @@ if ((isset($_SERVER['REQUEST_URI']) && ($_SERVER['REQUEST_URI'] !== ''))) {
   }
 }
 
-// echo "<br />" . $_SERVER['REQUEST_URI'] . "" ;
-// echo "<br />loc: " . $request_location . "";
-// echo "<br />cn: " . $request_call_number . "";
-
 $NOTSET = "RESERVE" ;  // constant: call number was not provided in the request
                   // default behavior appears to be QCAT -> no cn, equals a reserve item
                   // This can occur for any single item
@@ -72,7 +78,8 @@ $NOTSET = "RESERVE" ;  // constant: call number was not provided in the request
 // Get mapping file file handel to process the file
 $config_file = dirname(__FILE__) . '/mapping.csv';
 
-  $DEBUG_THINGS = false ; // flag to display debug info to browser window
+  // $DEBUG_THINGS = false ; // flag to display debug info to browser window
+  $DEBUG_THINGS = true ; // flag to display debug info to browser window
   $line_length = 4096; // amount of chars per line to read from csv file
 
 // CONSTANTS -------------------------------------------------------------------
@@ -123,18 +130,26 @@ $config_file = dirname(__FILE__) . '/mapping.csv';
   ] ;
 
 //VARIABLES --------------------------------------------------------------------
-  $resultz = "" ; // our output html
+  $item_location = "" ; // our output html
   $target_image = "" ; // the image information from CSV mapping file
   $callnumber = "" ; // stripped call number for testing if in range
+  $old_callnumber = "" ; 
   $callnumberdigits = "" ; // call numbers can have digits; Douglas library ranges are define accross Letters and digits
                      // ie. A-QA272 on 2nd floor, QA273 - Z on 1st floor
                      // mapping file can have start and end ranges that support this
   $range_start = "" ; // mapping record start range
   $range_end = "" ; // mapping record end range
-  // $first_match = 0 ; //
-  // $second_match = 0 ;
+
   $test_for_reserve = false ; // flag, testing for special cases (MICROLOG)
-  $test_flag = false ; // flag, have we matched a record in our mapping file. true ot false
+  $test_flag_start = false ; // flag, have we matched the range start of a record in our mapping file. true or false
+  $test_flag_end = false ; // flag, have we matched the range end of a record in our mapping file. true or false
+  $start_match_flag = false; // flag that we are or are not in the right record
+  $end_match_flag = false; // flag that we are or are not in the right record
+
+  if ($DEBUG_THINGS) {
+    echo "<br />loc: " . $request_location . "";
+    echo "<br />cn: " . $request_call_number . "<br />";
+  }
 
   // START SPECIAL CASES =========================================================
   // #0 Microform - Art collection microforms are now ll stauffer
@@ -181,16 +196,16 @@ if(file_exists($config_file)) {
       // call numbers are typically F#.<otherstuff> or FF#.<otherstuff>
       $temp_array = explode (".",$request_call_number) ; // explode call number into parts (delim by "."), we want 1st part
       $callnumber = trim(preg_replace("/\d+/", '', $temp_array[0])) ; // filter digits
+      $old_callnumber = $callnumber; // record the query callnumber, incase we need to match query to single char mapping ranges
       $callnumberdigits = trim(preg_replace("/\D/", '', $temp_array[0])) ; // filter non decimal, range can be 4 digits
     }
     $line_counter = 0;
 
     // while there are rows in our mapping file, look for a match
     while (($data = fgetcsv($fp, $line_length)) !== FALSE) {
+      $test_flag = false;
+
       $line_counter = $line_counter + 1;
-      // reset flags
-      // $first_match = 0 ;
-      // $second_match = 0 ;
 
       $range_start = trim(preg_replace("/\d+/", '', $data[$RANGE_START])) ; //
       $range_start_digits = trim(preg_replace("/\D/", '', $data[$RANGE_START])) ; // replace non digits, trim white space
@@ -202,7 +217,7 @@ if(file_exists($config_file)) {
 
        if ($DEBUG_THINGS) { // DEBUG
          echo "<br />call#: [" . $callnumber . "] [" . $callnumberdigits . "] " ;
-         echo "<br />testing: " . $range_start . "(".$range_start_digits.")". " - " . $range_end ."(".$range_end_digits.")" . " [" .$request_location. "]" ;
+         echo "_testing: " . $range_start . "(".$range_start_digits.")". " - " . $range_end ."(".$range_end_digits.")" . " [" .$request_location. "] @ row " . $line_counter . ": " . $data[$LOCATION_CODE];
        }
 
        // test if we are looking at a special case
@@ -214,30 +229,48 @@ if(file_exists($config_file)) {
         }
       } // end if we are testing for reserve items MICROLOG
       else {
-        // test call number ranges, eg. is call number AF in mapping file ranges AD - AX
-        // is call number[0] A >= range start[0] A AND call number[0] <= range end [0] A
 
+        // ADACOSTA TEST ====================================================================
+        $callnumber = $old_callnumber ; // reset
+        if ((strlen($callnumber) >= 1) && (strlen($range_start)) <= 1) {
+          echo "<br />START"." strcmp ". $callnumber[0] . " && ". $range_start . " (" . strcmp($callnumber[0], $range_start) . ")";
+          $start_match_flag = (strcmp($callnumber[0], $range_start) >= 0) ? true : false ;
+        }
+        else {
+          echo "<br />START"." strcmp ". $callnumber . " && ". $range_start . " (" . strcmp($callnumber, $range_start) . ")";
+          $start_match_flag = (strcmp($callnumber[0], $range_start) >= 0) ? true : false ;
+        }
+        if ((strlen($callnumber) >= 1) && (strlen($range_end)) <= 1) {
+          echo "<br />END"." strcmp ". $callnumber[0] . " && ". $range_end . " (" . strcmp($callnumber[0], $range_end) . ")";
+          $end_match_flag = (strcmp($callnumber[0], $range_end) <= 0) ? true : false ;
+        }
+        else {
+          echo "<br />END"." strcmp ". $callnumber . " && ". $range_end . " (" . strcmp($callnumber, $range_end) . ")";
+          $end_match_flag = (strcmp($callnumber, $range_end) <= 0) ? true : false ;
+        }
+        // ADACOSTA end TEST ================================================================
+        // If call number in in a mapping file record's range values
         if (($callnumber >= $range_start) && ($callnumber <= $range_end)) {
 
-          // we are in a potential range record
           if ($DEBUG_THINGS) { // DEBUG
-            echo "<br /> " . $callnumber . " is in range " . $range_start ." to ". $range_end ;
-            echo "<br /> callnumberdigits " . $callnumberdigits . " testing " . $range_end . " " . $range_end_digits ;
+            echo "<br /> >>>> " . $callnumber . " is in range " . $range_start ." to ". $range_end 
+                . " (" . $start_match_flag . " / " .$end_match_flag . ")";
           }
           $test_flag = true ; // we are in a mapping record that matches call number ranges
                               // eg. call number F is in range A to H
                               // ?loc=sl&cn=F against record "sl,...,A,H,"
 
-          if ((isset($callnumberdigits)) && ($callnumber == $range_end)) {  // need to test call number's digits against end range digits
-                                                                            // if call number == range end
-
-              $test_flag = ($callnumberdigits <= $range_end_digits) ? true : false ;  // if the call number digits <= range end digits we are in the right record - true
+          if ((isset($callnumberdigits)) && ($callnumber == $range_end) && (isset($range_end_digits)) && ($range_end_digits !=='')) { // need to test call number's digits against end range digits
+            // if we are testing end range number
+            $test_flag = ($callnumberdigits <= $range_end_digits) ? true : false ;  // if the call number digits <= range end digits we are in the right record - true
                                                                                       // if the call number difits are > than range end digitd, move on - false
-
-              if ($DEBUG_THINGS) { // DEBUG
-                echo "<br /> testing [ IS ] " . $callnumberdigits . " <= " . $range_end_digits . " ? ";
-              }
-
+            if ($DEBUG_THINGS) { // DEBUG
+              $retest_flag = ($callnumberdigits <= $range_end_digits) ? "true" : "false" ;
+              echo  "<br />" ."testing end range" 
+                  . ": " . $callnumber . $callnumberdigits 
+                  . " versus " . $range_end . $range_end_digits
+                  . " _ " . $retest_flag;
+            }
           }
         } // end if we have call number in range
       } // end else of if test for reserve
@@ -245,6 +278,7 @@ if(file_exists($config_file)) {
         // if we still have a true condition (call number is within a mapping record's start and end ranges),
         // we have found a matching record in our mapping file
         // or cn was empty or not found (make sure we actually have a match)
+
         if ($test_flag == true) {
 
           if ($DEBUG_THINGS) { // DEBUG
@@ -262,12 +296,12 @@ if(file_exists($config_file)) {
           //$target_image = "<img src=\"".$image_from_array_lookup."\" alt=\"".$alt_text."\" width=\"95%\" height=\"95%\">" ;
           $target_image = "<img src=\"".$image_from_array_lookup."\" alt=\"".$alt_text."\">" ;
           // build the html to display the matching record's floor plan location information and associated image
-          $resultz = "<h1>" . $data[$LOCATION_LIBRARY] . " Library</h1>"
+          $item_location = "<h1>" . $data[$LOCATION_LIBRARY] . " Library</h1>"
                      . "<h2>" . $data[$LOCATION_FLOOR] . ", " .$data[$LOCATION_LABEL] . "</h2>"
                      . "<p>"
                      . "Item: <strong>" . $request_call_number . "</strong>"
                      . "</p>";
-          $resultz .= $target_image ;
+          $item_location .= $target_image ;
           // we can stop here
           break ;
         } // end if we have a matching record
@@ -280,7 +314,9 @@ if(file_exists($config_file)) {
      else { // we do not have a loc code
 
        // display a default no image found message
-       $resultz = "<p><h4>A floor plan is not available for this item.</h4>Please contact Information Services.</p>" ;
+       $item_location = "<p><strong>A floor plan location is not available for this item.</strong>"
+                  . "<br />" . "Call Number: " . $request_call_number
+                  . "<br />" . "Please contact Information Services.</p>" ;
 
      } // end else we do not have a loc code
 
@@ -302,7 +338,7 @@ if(file_exists($config_file)) {
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
         <link rel="shortcut icon" href="https://library.queensu.ca/sites/all/themes/qul/favicon.ico" type="image/vnd.microsoft.icon">
 
-        <title>QCAT - Find on Floorplan</title>
+        <title>OMNI - Find on Floorplan</title>
 
         <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,700" rel="stylesheet">
 
@@ -310,6 +346,8 @@ if(file_exists($config_file)) {
           body {
             font-family: "Open Sans",Helvetica,Arial,sans-serif;
             font-size: 14px;
+            width: 600px;
+            height: 900px;
           }
           img {
             width: 100%;
@@ -331,7 +369,7 @@ if(file_exists($config_file)) {
     <body>
         <div>
           <?php
-            echo $resultz ;
+            echo $item_location ;
           ?>
         </div>
     </body>

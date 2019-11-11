@@ -49,9 +49,14 @@ if (isset($_GET['cn'])) {
   $request_call_number = strtoupper($request_call_number);
 }
 
+$using_pipe = false; // flag to track if we found & or | separating loc and call number (QCat versus PrimoVE)
+                    // Used to provide specific styling to map image if PrimoVE
+
 // Check request uri values for PIPEs - PrimoVE bug, replacing & with &amp; (separating request variables)
 if ((isset($_SERVER['REQUEST_URI']) && ($_SERVER['REQUEST_URI'] !== ''))) {
   if (strpos($_SERVER['REQUEST_URI'],"|")) {
+
+    $using_pipe = true;
 
     $test_uri = $_SERVER['REQUEST_URI'];
     $test_for_vars = stristr($test_uri,"?");
@@ -145,6 +150,8 @@ $config_file = dirname(__FILE__) . '/mapping.csv';
   $test_flag_end = false ; // flag, have we matched the range end of a record in our mapping file. true or false
   $start_match_flag = false; // flag that we are or are not in the right record
   $end_match_flag = false; // flag that we are or are not in the right record
+
+  $img_width = "100%" ; // used to style map img
 
   if ($DEBUG_THINGS) {
     echo "<br />loc: " . $request_location . "";
@@ -327,6 +334,12 @@ if(file_exists($config_file)) {
   // we are done close the mapping file
   fclose($fp);
 
+  if ((isset($using_pipe)) && ($using_pipe == true)) {
+    $img_width = "50%";
+    if ($DEBUG_THINGS) { echo "<br />we are using the pipe and flag is true, width is 50%" ;}
+  } else {
+    if ($DEBUG_THINGS) { echo "<br />we are using the pipe and flag is false, width is 100%" ;}
+  }
 } // end if file exists
 // STOP Processing
 ?>
@@ -350,7 +363,7 @@ if(file_exists($config_file)) {
             height: 900px;
           }
           img {
-            width: 100%;
+            width: <?php echo $img_width; ?>
           }
           h1, h2 {
             color: #00305e;

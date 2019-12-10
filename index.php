@@ -76,9 +76,7 @@ if ((isset($_SERVER['REQUEST_URI']) && ($_SERVER['REQUEST_URI'] !== ''))) {
   }
 }
 
-$NOTSET = "RESERVE" ;  // constant: call number was not provided in the request
-                  // default behavior appears to be QCAT -> no cn, equals a reserve item
-                  // This can occur for any single item
+$NOTSET = "Call number not set" ;  // constant: call number was not provided in the request
 
 // Get mapping file file handel to process the file
 $config_file = dirname(__FILE__) . '/mapping.csv';
@@ -136,6 +134,7 @@ $config_file = dirname(__FILE__) . '/mapping.csv';
 
 //VARIABLES --------------------------------------------------------------------
   $item_location = "" ; // our output html
+  $admin_message = "" ; // message to admin ie. no mapping found
   $target_image = "" ; // the image information from CSV mapping file
   $callnumber = "" ; // stripped call number for testing if in range
   $old_callnumber = "" ; 
@@ -320,12 +319,11 @@ if(file_exists($config_file)) {
      } // end if we have a matching loc code
      else { // we do not have a loc code
 
-       // display a default no image found message
-       $item_location = "<p><strong>A floor plan location is not available for this item.</strong>"
-                  . "<br />" . "Call Number: " . $request_call_number
-                  . "<br />" . "Please contact Information Services.</p>" ;
-
-     } // end else we do not have a loc code
+            // display a default no image found message
+            $item_location = "<p><strong>A floor plan location is not available for this item.</strong>"
+                      . "<br />" . "Call Number: " . $request_call_number
+                      . "<br />" . "Please contact Information Services.</p>" ;
+    } // end else we do not have a loc code
 
    } // END LOOP
 
@@ -333,6 +331,23 @@ if(file_exists($config_file)) {
 
   // we are done close the mapping file
   fclose($fp);
+
+  // ADACOSTA - testing, do we want to record not found 
+  // if ($test_flag === false) {
+  //   // notify quladmin, we have a potential map issue
+  //   $to = ""; $subject = ""; $admin_message = ""; $admin_email_headers = ""; $from = "" ;
+  //   $to = "adacosta@queensu.ca";
+  //   $from = "library.queensu.ca" ;
+  //   $subject = "Find on floorplan - check mapping" . date('YYYY-MM-DD');
+  //   $admin_message =  "Find on floorplan - check mapping"
+  //                     . "<br/> loc=" . $request_location . " & cn=" . $request_call_number
+  //                     . "";
+  //   $admin_email_headers = "From: " .$from . "\r\n";
+  //   mail($to, $subject, $admin_message, $admin_email_headers) ;
+  //   if ($DEBUG_THINGS) { // DEBUG
+  //     echo "<br/>" . $admin_message . "<br/>" ;
+  //   }
+  // }
 
   if ((isset($using_pipe)) && ($using_pipe == true)) {
     $img_width = "90%";
@@ -351,7 +366,7 @@ if(file_exists($config_file)) {
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
         <link rel="shortcut icon" href="https://library.queensu.ca/sites/all/themes/qul/favicon.ico" type="image/vnd.microsoft.icon">
 
-        <title>OMNI - Find on Floorplan</title>
+        <title>Omni - Find on Floorplan</title>
 
         <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,700" rel="stylesheet">
 
